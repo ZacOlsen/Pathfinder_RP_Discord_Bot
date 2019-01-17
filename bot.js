@@ -25,130 +25,81 @@ bot.on('ready', function (evt) {
 
 bot.on('message', function (user, userID, channelID, message, evt) {
 
-    // Our bot needs to know if it will execute a command
-    // It will listen for messages that will start with `!`
+	function sendToChannel(message){
+		bot.sendMessage({
+			to: channelID,
+            message: message
+        });
+	}
+
     if (message.substring(0, 1) == '!') {
+		message = message.toLowerCase();
         var args = message.substring(1).split(' ');
         var cmd = args[0];
-       
+       	   
         args = args.splice(1);
         switch(cmd) {
 
-            // !ping
             case 'ping':
-                bot.sendMessage({
-                    to: channelID,
-                    message: 'Pong!'
-                });
-			break;
+                sendToChannel('Pong!');
+				break;
 				
 			case 'roll':
 			
 				if(args.length == 0 || args.length > 3 || args.length == 2){
-					bot.sendMessage({
-						to: channelID,
-						message: '<@' + userID + '> Invalid Command Usage'
-					});
-					
+					sendToChannel('<@' + userID + '> Invalid Command Usage');
 					break;
 				}
 			
 				var split = args[0].indexOf('d');
 				if(split == -1){
-					bot.sendMessage({
-						to: channelID,
-						message: '<@' + userID + '> Invalid Command Usage'
-					});
-					
+					sendToChannel('<@' + userID + '> Invalid Command Usage');
 					break;
 				}
 			
-				var dieCount = parseInt(args[0].substring(0, split), 10);
-				var dieNum = parseInt(args[0].substring(split + 1, args[0].length));
-				if(isNaN(dieCount) || dieCount <= 0|| isNaN(dieNum) || dieNum <= 0){
-					bot.sendMessage({
-						to: channelID,
-						message: '<@' + userID + '> Invalid Command Usage'
-					});
-					
+				var numberOfRolls = parseInt(args[0].substring(0, split), 10);
+				var maxDieValue = parseInt(args[0].substring(split + 1, args[0].length));
+				if(isNaN(numberOfRolls) || numberOfRolls <= 0|| isNaN(maxDieValue) || maxDieValue <= 0){
+					sendToChannel('<@' + userID + '> Invalid Command Usage');
 					break;
 				}
 			
-				var i;
-				var dSum = 0;
-				var dMessage = '(';
-				for(i = 0; i < dieCount; i++){
-					var d = getRandomInt(1, dieNum);
-					dSum += d;						
-					dMessage += d;
-						
-					if(i < dieCount - 1){
-						dMessage += ', ';
-					}
-				}
-				dMessage += ')';
+				var dResults = rollDice(numberOfRolls, maxDieValue);
 			
 				if(args.length == 3){
 					
 					var bSplit = args[2].indexOf('b');
-					var bCount = parseInt(args[2].substring(0, bSplit), 10);
-					if(isNaN(bCount) || bCount <= 0 || bSplit < 0){
-						bot.sendMessage({
-							to: channelID,
-							message: '<@' + userID + '> Invalid Command Usage'
-						});
-					
+					var numberOfBRolls = parseInt(args[2].substring(0, bSplit), 10);
+					if(isNaN(numberOfBRolls) || numberOfBRolls <= 0 || bSplit < 0){
+						sendToChannel('<@' + userID + '> Invalid Command Usage');
 						break;
 					}
-
-					var greatestB = 0;
-					var bMessage = '(';
-					for(i = 0; i < bCount; i++){
-						var b = getRandomInt(1, 6);
-						if(b > greatestB){
-							greatestB = b;
-						}
-						
-						bMessage += b;
-						
-						if(i < bCount - 1){
-							bMessage += ', ';
-						}
-					}
-					bMessage += ')';
+				
+					var bResults = rollDice(numberOfBRolls, 6);
+					var total = dResults.sumOfRolls;
+					var bMessage;
 
 					if(args[1] == '+'){
-						bot.sendMessage({
-							to: channelID,
-							message: '<@' + userID + '> total **' + (dSum + greatestB) + '**. Die rolls: ' + dMessage + '. Boons: ' + bMessage + '.'
-						});
+						total += bResults.highestRoll;
+						bMessage = '. Boons: ';
 						
 					}else if(args[1] == '-'){
-						bot.sendMessage({
-							to: channelID,
-							message: '<@' + userID + '> total **' + (dSum - greatestB) + '**. Die rolls: ' + dMessage + '. Banes: ' + bMessage + '.'
-						});
+						total -= bResults.highestRoll;
+						bMessage = '. Banes: ';
 
 					}else{
-						bot.sendMessage({
-							to: channelID,
-							message: '<@' + userID + '> Invalid Command Usage'
-						});
-					
-						break;
+						sendToChannel('<@' + userID + '> Invalid Command Usage');
 					}
+					
+					sendToChannel('<@' + userID + '> total **' + total + 
+						'**. Die rolls: ' + dResults.message + bMessage + bResults.message + '.');
+					
 				}else{
-						
-					bot.sendMessage({
-						to: channelID,
-						message: '<@' + userID + '> total **' + dSum + '**. Die rolls: ' + dMessage + '.'
-					});
+					sendToChannel('<@' + userID + '> total **' + dResults.sumOfRolls + '**. Die rolls: ' + dResults.message + '.');
 				}
-            break;
-
-            // Just add any case commands if you want to..
+				
+				break;
         }
-
      }
 });
 
@@ -156,4 +107,33 @@ function getRandomInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function rollDice(numberOfRolls, maxDieValue){
+	
+	var i;
+	var sum = 0;
+	var highestRoll = 0;
+	var message = '(';
+	for(i = 0; i < numberOfRolls; i++){
+		var roll = getRandomInt(1, maxDieValue);
+		sum += roll;						
+		message += roll;
+		
+		if(roll > highestRoll){
+			highestRoll = roll;
+		}
+		
+		if(i < numberOfRolls - 1){
+			message += ', ';
+		}
+	}
+	
+	message += ')';
+	
+	return {
+		message: message,
+		highestRoll: highestRoll,
+		sumOfRolls: sum
+	};
 }
