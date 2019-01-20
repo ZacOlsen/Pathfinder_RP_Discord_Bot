@@ -31,77 +31,159 @@ bot.on('message', function (user, userID, channelID, message, evt) {
             message: message
         });
     }
+    
+    function sendErrorMessage(){
+        sendToChannel('<@' + userID + '> Invalid Command Usage.');
+    }
 
-    if (message.substring(0, 1) == '!') {
-        message = message.toLowerCase();
-        var args = message.substring(1).split(' ');
-        var cmd = args[0];
-           
-        args = args.splice(1);
-        switch(cmd) {
+    message = message.toLowerCase();
+    if (message.substring(0, 6) == '!roll ') {
+        message = message.substring(6, message.length);
+        message = message.replace(/\s/g, '');
+        
+        var cmdIndex = 0;
+        
+        var CommandState = Object.freeze({"numOfDieRolls":0, "dieIndicator":1, "maxDieVal":2, "bDeterminer":3, "numOfBRolls":4, "bIndicator":5});
+        var currentState = CommandState.numOfDieRolls;
+        
+        var numOfDieRolls = '';
+        var maxDieVal = '';
+        
+        var boon = false;
+        var bane = false;
+        var numOfBRolls = '';
+        var bVerify = false;
+        
+        while(cmdIndex < message.length){
+            switch(currentState){
+            
+                case CommandState.numOfDieRolls:
 
-            case 'ping':
-                sendToChannel('Pong!');
-                break;
-                
-            case 'roll':
-            
-                if(args.length == 0 || args.length > 3 || args.length == 2){
-                    sendToChannel('<@' + userID + '> Invalid Command Usage');
-                    break;
-                }
-            
-                var split = args[0].indexOf('d');
-                if(split == -1){
-                    sendToChannel('<@' + userID + '> Invalid Command Usage');
-                    break;
-                }
-            
-                var numberOfRolls = parseInt(args[0].substring(0, split), 10);
-                var maxDieValue = parseInt(args[0].substring(split + 1, args[0].length));
-                if(isNaN(numberOfRolls) || numberOfRolls <= 0|| isNaN(maxDieValue) || maxDieValue <= 0){
-                    sendToChannel('<@' + userID + '> Invalid Command Usage');
-                    break;
-                }
-            
-                var dResults = rollDice(numberOfRolls, maxDieValue);
-            
-                if(args.length == 3){
-                    
-                    var bSplit = args[2].indexOf('b');
-                    var numberOfBRolls = parseInt(args[2].substring(0, bSplit), 10);
-                    if(isNaN(numberOfBRolls) || numberOfBRolls <= 0 || bSplit < 0){
-                        sendToChannel('<@' + userID + '> Invalid Command Usage');
-                        break;
+                    if(isCharDigit(message.charAt(cmdIndex))){
+                        numOfDieRolls += message.charAt(cmdIndex);
+                        cmdIndex++;
+                        
+                    }else if(numOfDieRolls.length > 0){
+                        currentState = CommandState.dieIndicator;
+                        
+                    }else{
+                        sendErrorMessage();
+                        return;
                     }
                 
-                    var bResults = rollDice(numberOfBRolls, 6);
-                    var total = dResults.sumOfRolls;
-                    var bMessage;
-
-                    if(args[1] == '+'){
-                        total += bResults.highestRoll;
-                        bMessage = '. Boons: ';
+                    break;
+                
+                case CommandState.dieIndicator:
+                
+                    if(message.charAt(cmdIndex) == 'd'){
+                        cmdIndex++;
+                        currentState = CommandState.maxDieVal;
                         
-                    }else if(args[1] == '-'){
-                        total -= bResults.highestRoll;
-                        bMessage = '. Banes: ';
+                    }else{
+                        sendErrorMessage();
+                        return;
+                    }
+                
+                    break;
+                    
+                case CommandState.maxDieVal:
+                
+                    if(isCharDigit(message.charAt(cmdIndex))){
+                        maxDieVal += message.charAt(cmdIndex);
+                        cmdIndex++;
+                        
+                    }else if(maxDieVal.length > 0){
+                        currentState = CommandState.bDeterminer;
+                        
+                    }else{
+                        sendErrorMessage();
+                        return;
+                    }
+                
+                break;
+                
+                case CommandState.bDeterminer:
+                
+                    if(message.charAt(cmdIndex) == '+'){
+                        boon = true;
+                        currentState = CommandState.numOfBRolls;
+                        cmdIndex++;
+                        
+                    }else if(message.charAt(cmdIndex) == '-'){
+                        bane = true;
+                        currentState = CommandState.numOfBRolls;
+                        cmdIndex++;
 
                     }else{
-                        sendToChannel('<@' + userID + '> Invalid Command Usage');
+                        sendErrorMessage();
+                        return;
                     }
-                    
-                    sendToChannel('<@' + userID + '> total **' + total + 
-                        '**. Die rolls: ' + dResults.message + bMessage + bResults.message + '.');
-                    
-                }else{
-                    sendToChannel('<@' + userID + '> total **' + dResults.sumOfRolls + '**. Die rolls: ' + dResults.message + '.');
-                }
                 
                 break;
+                
+                case CommandState.numOfBRolls:
+                
+                    if(isCharDigit(message.charAt(cmdIndex))){
+                        numOfBRolls += message.charAt(cmdIndex);
+                        cmdIndex++;
+                        
+                    }else if(numOfBRolls.length > 0){
+                        currentState = CommandState.bIndicator;
+                        
+                    }else{
+                        sendErrorMessage();
+                        return;
+                    }
+                    
+                break;
+                
+                case CommandState.bIndicator:
+                
+                    if(message.charAt(cmdIndex) == 'b'){
+                        bVerify = true;
+                        cmdIndex++;
+                        
+                    }else{
+                        sendErrorMessage();
+                        return;
+                    }
+                
+                break;
+                
+                default:
+                    cmdIndex = message.length;
+                    break;
+            }
         }
-     }
+                
+        if(((boon || bane) && !bVerify) || maxDieVal.length == 0){
+            sendErrorMessage();
+            return;
+        }
+        
+        numOfDieRolls = parseInt(numOfDieRolls);
+        maxDieVal = parseInt(maxDieVal);
+        numOfBRolls = parseInt(numOfBRolls);
+        
+        var diceResults = rollDice(numOfDieRolls, maxDieVal);
+        
+        if(bVerify){
+            
+            var bResults = rollDice(numOfBRolls, 6);
+            var total = boon ? (diceResults.sumOfRolls + bResults.highestRoll) : (diceResults.sumOfRolls - bResults.highestRoll);
+
+            sendToChannel('<@' + userID + '> total **' + total + '**. Die rolls: ' + diceResults.message + (boon ? '. Boons: ' : '. Banes: ') 
+                + bResults.message + '.');
+            
+        }else{
+            sendToChannel('<@' + userID + '> total **' + diceResults.sumOfRolls + '**. Die rolls: ' + diceResults.message + '.');
+        }        
+    }
 });
+
+function isCharDigit(c){
+    return c >= '0' && c <= '9';
+}
 
 function getRandomInt(min, max) {
     min = Math.ceil(min);
